@@ -2,7 +2,7 @@ import os
 import json
 import requests
 from typing import List, Dict, Any, Optional        
-from ConversationMemory import ConversationMemory
+from ConversationSummaryMemory import ConversationSummaryMemory
 from ToolExecutor import ToolExecutor
 from tools import search_movie_by_title, search_movie_by_id, analyze_cinematography, get_movie_ratings
 
@@ -22,7 +22,7 @@ class CinematographyAgent:
     def __init__(self, model: str = "gpt-4o-mini"):
         self.api_key = os.getenv("OPENAI_API_KEY")
         self.model = model
-        self.memory = ConversationMemory(max_messages=20)
+        self.memory = ConversationSummaryMemory(max_recent_messages=10, summarize_after=20)
         self.tool_executor = ToolExecutor(AVAILABLE_TOOLS)
         
         # System prompt
