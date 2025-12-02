@@ -45,38 +45,71 @@ class ToolExecutor:
         except Exception as e:
             return json.dumps({"error": f"Tool execution failed: {str(e)}"})
     
-    def get_tool_schemas(self):
-            tool_schemas = []
-
-            for func in self.tools:
-                name = func.__name__
-                description = (func.__doc__ or "").strip()
-
-                sig = inspect.signature(func)
-                properties = {}
-                required = []
-
-                for param_name, param in sig.parameters.items():
-                    # Default: treat everything as string inputs
-                    properties[param_name] = {
+    def get_tool_schemas(self) -> List[Dict]:
+        """Convert LangChain tools to OpenAI function calling format"""
+        schemas = []
+        
+        # Manual schema definition to ensure OpenAI compatibility
+        tool_schemas = {
+            "search_movie_by_title": {
+                "type": "object",
+                "properties": {
+                    "title": {
                         "type": "string",
-                        "description": f"{param_name} parameter"
+                        "description": "The movie title to search for (e.g., 'Guardians of the Galaxy')"
                     }
-                    if param.default is inspect._empty:
-                        required.append(param_name)
-
-                schema = {
-                    "type": "function",
-                    "function": {
-                        "name": name,
-                        "description": description,
-                        "parameters": {
-                            "type": "object",
-                            "properties": properties,
-                            "required": required
-                        }
+                },
+                "required": ["title"]
+            },
+            "search_movie_by_id": {
+                "type": "object",
+                "properties": {
+                    "imdb_id": {
+                        "type": "string",
+                        "description": "The IMDb ID (e.g., 'tt3896198')"
                     }
+                },
+                "required": ["imdb_id"]
+            },
+            "analyze_cinematography": {
+                "type": "object",
+                "properties": {
+                    "movie_data": {
+                        "type": "string",
+                        "description": "JSON string of movie data from search results"
+                    }
+                },
+                "required": ["movie_data"]
+            },
+            "get_movie_ratings": {
+                "type": "object",
+                "properties": {
+                    "movie_data": {
+                        "type": "string",
+                        "description": "JSON string of movie data"
+                    }
+                },
+                "required": ["movie_data"]
+            }
+        }
+        
+        for tool in self.tools.values():
+            tool_name = tool.name
+            tool_desc = tool.description
+            
+            schema = {
+                "type": "function",
+                "function": {
+                    "name": tool_name,
+                    "description": tool_desc,
+                    "parameters": tool_schemas.get(tool_name, {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    })
                 }
-
-                tool_schemas.append(schema)
-            return tool_schemas
+            }
+            schemas.append(schema)
+        
+        return schemas
+         

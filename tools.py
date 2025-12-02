@@ -17,8 +17,8 @@ def search_movie_by_title(title: str) -> str:
     Returns:
         JSON string with complete movie details
     """
-    api_url = os.getenv("MOVIE_API_URL")
-    api_key = os.getenv("MOVIE_API_KEY")
+    api_url = os.getenv("OMDB_API_URL")
+    api_key = os.getenv("OMDB_API_KEY")
     
     if not api_url:
         return json.dumps({"error": "MOVIE_API_URL not configured in environment"})
@@ -64,11 +64,11 @@ def search_movie_by_id(imdb_id: str) -> str:
     Returns:
         JSON string with complete movie details
     """
-    api_url = os.getenv("MOVIE_API_URL")
-    api_key = os.getenv("MOVIE_API_KEY")
+    api_url = os.getenv("OMDB_API_URL")
+    api_key = os.getenv("OMDB_API_KEY")
     
     if not api_url:
-        return json.dumps({"error": "MOVIE_API_URL not configured in environment"})
+        return json.dumps({"error": "OMDB_API_URL not configured in environment"})
     
     try:
         params = {"i": imdb_id}  # 'i' for IMDb ID

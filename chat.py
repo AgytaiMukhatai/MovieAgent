@@ -1,10 +1,16 @@
 from agent import CinematographyAgent
+import os
 
 if __name__ == "__main__":
     # Load environment variables
     from dotenv import load_dotenv
     load_dotenv()
     
+    print("🔍 Environment Check:")
+    print(f"  OPENAI_API_KEY: {'✅ Set' if os.getenv('OPENAI_API_KEY') else '❌ Missing'}")
+    print(f"  MOVIE_API_URL: {os.getenv('OMDB_API_URL') or '❌ Missing'}")
+    print(f"  MOVIE_API_KEY: {'✅ Set' if os.getenv('OMDB_API_KEY') else '❌ Missing'}")
+    print()
     # Initialize agent
     agent = CinematographyAgent(model="gpt-4o-mini")
     

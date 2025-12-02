@@ -143,8 +143,8 @@ cinematographers, and enthusiasts."""
                 final_answer = content or "I apologize, I couldn't generate a response."
                 self.memory.add_message("assistant", final_answer)
                 
-                if verbose:
-                    print(f"\n✅ Final Answer:\n{final_answer}\n")
+                #if verbose:
+                    #print(f"\n✅ Final Answer:\n{final_answer}\n")
                 
                 return final_answer
             
