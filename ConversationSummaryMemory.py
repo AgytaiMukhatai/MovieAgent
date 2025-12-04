@@ -66,6 +66,8 @@ class ConversationSummaryMemory:
 
         self.summary: str = ""           # long-term memory (text)
         self.history: List[Message] = [] # raw messages (no system)
+        self.movies_discussed: List[str] = []  # Track movie titles discussed
+        self.movie_context: Dict[str, Dict] = {}  # Store movie data by title
 
     def add_message(self, role: str, content: str):
         self.history.append({"role": role, "content": content})
@@ -124,3 +126,40 @@ class ConversationSummaryMemory:
         messages.extend(self.history)
 
         return messages
+    
+    def add_movie_to_context(self, title: str, movie_data: Dict):
+        """Add a movie to the context of discussed movies"""
+        if title and title not in self.movies_discussed:
+            self.movies_discussed.append(title)
+        if title:
+            self.movie_context[title] = movie_data
+    
+    def get_recent_movies_discussed(self) -> List[str]:
+        """Get list of movies discussed in the conversation"""
+        return self.movies_discussed.copy()
+    
+    def save_to_file(self, filename: str = "conversation.json"):
+        """Save conversation history and context to a JSON file"""
+        data = {
+            "summary": self.summary,
+            "history": self.history,
+            "movies_discussed": self.movies_discussed,
+            "movie_context": self.movie_context
+        }
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+    
+    def load_from_file(self, filename: str = "conversation.json"):
+        """Load conversation history and context from a JSON file"""
+        try:
+            with open(filename, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            self.summary = data.get("summary", "")
+            self.history = data.get("history", [])
+            self.movies_discussed = data.get("movies_discussed", [])
+            self.movie_context = data.get("movie_context", {})
+        except FileNotFoundError:
+            print(f"⚠️ File {filename} not found. Starting with empty conversation.")
+        except json.JSONDecodeError:
+            print(f"⚠️ Error reading {filename}. File may be corrupted.")

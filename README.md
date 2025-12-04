@@ -1,0 +1,193 @@
+## MovieAgent – Cinematography-Focused Movie Assistant
+Variant #3
+
+MovieAgent is a command-line AI assistant that specializes in **cinematography and movie analysis**.  
+It combines OpenAI models with the OMDb movie database and a set of structured tools to:
+
+- **Look up movies** by title or IMDb ID
+- **Inspect ratings** (IMDb, Metacritic, Rotten Tomatoes)
+- **Compare movies** and filter by minimum IMDb rating
+
+- **Maintain conversation memory** about the user and previously discussed films
+
+The main entrypoint is `chat.py`, which runs an interactive REPL-style chat with the `CinematographyAgent`.
+
+---
+
+## Project Structure
+
+- **`agent.py`**: Defines the `CinematographyAgent`, which:
+  - Calls the OpenAI Chat Completions API
+  - Uses tools from `tools.py` for OMDb lookups and analysis
+  - Maintains conversational context via `ConversationSummaryMemory`
+  - Automatically extracts and tracks movie titles mentioned in conversation (even when tools aren't called)
+- **`chat.py`**: CLI interface for chatting with the agent (history, movies, save/load, quit commands).
+- **`tools.py`**: LangChain tools for:
+  - Searching movies by title / ID
+  - Getting ratings
+  - Comparing movies
+  - Searching lists of movies and filtering by minimum IMDb rating
+  - Extracting cast/authors and running basic cinematography analysis.
+- **`ToolExecutor.py`**: Bridges LangChain tools with the OpenAI function-calling interface.
+- **`ConversationSummaryMemory.py`**: 
+  - Summarizes and persists long-term user/conversation memory using OpenAI
+  - Tracks movies discussed in the conversation
+  - Provides save/load functionality for conversation history and movie context
+- **`kino/`**: Local Python virtual environment (includes installed dependencies).
+- **`experiments/`**: Contains step-by-step implementation files where the project was developed incrementally. These files demonstrate the development process and can be useful for understanding how the agent was built.
+
+---
+
+## Requirements
+
+- **Python**: 3.12 
+- **Core Python packages** 
+  - `openai`
+  - `python-dotenv`
+  - `requests`
+  - `langchain`
+
+You will also need:
+
+- An **OpenAI API key**
+- An **OMDb API key** (free keys available from the OMDb website)
+
+---
+
+## Setup
+
+You can either use the existing `kino` virtual environment or create a new one.
+
+### Option 1: Use the existing `kino` environment
+
+From the `MovieAgent` directory:
+
+```bash
+source kino/bin/activate
+```
+
+The `kino` environment already has all required packages installed.
+
+### Option 2: Create a new virtual environment
+
+From the `MovieAgent` directory:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+---
+
+## Configuration
+
+The project expects certain environment variables, typically loaded via `python-dotenv` from a `.env` file.
+
+Create a `.env` file in the `MovieAgent` directory with:
+
+```bash
+OPENAI_API_KEY=your_openai_api_key_here
+OMDB_API_KEY=your_omdb_api_key_here
+OMDB_API_URL=http://www.omdbapi.com/
+```
+
+- `OPENAI_API_KEY`: Used by both `agent.py` and `ConversationSummaryMemory.py`.
+- `OMDB_API_KEY`: Used by `tools.py` for all OMDb calls.
+- `OMDB_API_URL`: Base URL for OMDb (default is `http://www.omdbapi.com/` if not set).
+
+`chat.py` will print a short environment check when you start it (showing whether required vars are set).
+
+---
+
+## Running the Cinematography Agent
+
+From the `MovieAgent` directory, with your virtual environment activated and `.env` configured:
+
+```bash
+python chat.py
+```
+
+You'll see a short environment check and then an interactive prompt:
+
+- Type any **question about movies or cinematography**, for example:
+  - "Analyze the cinematography of Guardians of the Galaxy Vol. 2."
+  - "Compare The Dark Knight and Batman Begins."
+  - "Recommend high-rated sci-fi movies."
+  - "I like Interstellar" (movies are automatically tracked even in casual mentions)
+- Use these special commands:
+  - **`history`**: Show a compact conversation history.
+  - **`movies`**: List all movies discussed so far in the conversation. (BETA)
+  - **`save`**: Save the conversation (including movie context) to `conversation.json`.
+  - **`load`**: Load a previously saved conversation (including movie context) from `conversation.json`.
+  - **`quit`**: Exit the program.
+
+The agent automatically:
+- Decides when to call tools (OMDb lookups, rating extraction, cinematography analysis)
+- Tracks movies mentioned in conversation (even when responding without tool calls)
+- Uses long-term memory to stay consistent with user preferences over time
+
+---
+
+## How Tool Calling Works (High-Level)
+
+- `CinematographyAgent` builds a message history, including:
+  - A detailed system prompt with strict rules about **always using tools for factual movie data**.
+  - Conversation history plus a long-term summary from `ConversationSummaryMemory`.
+- It calls the OpenAI Chat Completions API with a **tools** schema generated by `ToolExecutor`.
+- Any tool calls returned by the model are:
+  - Parsed in `ToolExecutor.parse_tool_calls`
+  - Executed using LangChain tool `invoke`
+  - Fed back to the model as `tool` messages to synthesize a final response.
+- **Movie Tracking**: Even when tools aren't called, the agent extracts movie titles from user input using pattern matching, ensuring movies mentioned in casual conversation are tracked.
+
+You normally don't need to interact with this layer directly; it's useful if you want to extend the agent with new tools.
+
+---
+
+## Extending the Project
+
+- **Add new tools**:
+  - Implement them in `tools.py` using the `@tool` decorator.
+  - Add them to the `AVAILABLE_TOOLS` list in `tools.py`.
+  - If the tool needs custom schema (for OpenAI function calling), extend `ToolExecutor.get_tool_schemas`.
+- **Change the model**:
+  - In `agent.py`, adjust the default `model` in `CinematographyAgent.__init__`.
+  - In `ConversationSummaryMemory.py`, adjust the `model` used in `summarize_messages`.
+- **Customize system behavior**:
+  - Edit the `system_prompt` in `agent.py` to tune style, strictness, and domain focus.
+
+---
+
+## Features
+
+### Automatic Movie Tracking
+The agent automatically tracks movies mentioned in conversation, even when:
+- You casually mention a movie (e.g., "I like Interstellar")
+- The agent responds without calling tools
+- Movies are discussed across multiple conversation turns
+
+Use the `movies` command to see all tracked movies at any time.
+
+### Conversation Persistence
+- Save conversations with `save` command - stores both conversation history and movie context
+- Load previous conversations with `load` command - restores full context including discussed movies
+- Conversations are saved as JSON files for easy inspection and backup
+
+---
+
+## Troubleshooting
+
+- **Missing API keys**:
+  - `chat.py` prints checks for `OPENAI_API_KEY` and OMDb variables; make sure they appear as "Set".
+- **OMDb errors or empty results**:
+  - Confirm your `OMDB_API_KEY` is valid and the `OMDB_API_URL` is reachable.
+- **OpenAI errors / rate limits**:
+  - `agent.py` logs the payload and error body for failed calls and retries with exponential backoff.
+  - Check your OpenAI dashboard for limits or errors.
+- **Movies not appearing in `movies` command**:
+  - Movies are tracked automatically when mentioned. If a movie doesn't appear, try mentioning it explicitly (e.g., "Tell me about [Movie Title]").
+
+If you run into issues specific to your environment, include the printed debug output when asking for help.
+
+

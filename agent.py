@@ -1,17 +1,12 @@
 import os
 import json
 import requests
+import re
 from typing import List, Dict, Any, Optional        
 from ConversationSummaryMemory import ConversationSummaryMemory
 from ToolExecutor import ToolExecutor
-from tools import search_movie_by_title, search_movie_by_id, analyze_cinematography, get_movie_ratings
+from tools import AVAILABLE_TOOLS
 
-AVAILABLE_TOOLS = [
-    search_movie_by_title,
-    search_movie_by_id,
-    analyze_cinematography,
-    get_movie_ratings
-]
 
 class CinematographyAgent:
     """
@@ -30,9 +25,10 @@ class CinematographyAgent:
 
 Your responsibilities:
 1. Retrieve accurate movie data using tools.
-2. Provide high-quality cinematography insights.
+2. Provide detailed and accurate information about the movie.
 3. Never guess or hallucinate any factual movie information.
-
+4. Never make up any information.
+5. Never provide any information that is not present in the tool results.
 ----------------------------------------------
 TOOL USAGE RULES (VERY IMPORTANT)
 ----------------------------------------------
@@ -51,9 +47,13 @@ You MUST ALWAYS call a tool before answering when the user asks for:
 
 Use these tools:
 1. `search_movie_by_title` for title-based queries.
-2. `search_movie_by_id` when the IMDb ID is provided.
-3. `get_movie_ratings` when the user asks about ratings.
-4. `analyze_cinematography` to produce professional visual analysis.
+2. `get_movie_ratings` when the user asks about ratings.
+3. 'search_movies_list' when the user asks about a list of movies.
+4. 'compare_movies' when the user asks to compare two movies.
+5. 'get_cast_and_authors' when the user asks about the cast and authors of a movie.
+6. 'find_movies_by_min_imdb_rating' when the user asks to find movies by minimum IMDb rating.
+
+
 
 NEVER answer factual questions from built-in knowledge when a tool exists.
 The only time you do NOT call a tool is when:
@@ -66,9 +66,7 @@ AFTER GETTING TOOL RESULTS
 ---------------------------------------------------------
 After receiving tool output, use it to:
 - Build a detailed answer
-- Explain the film’s cinematography style
 - Reference specific scenes
-- Comment on lighting, composition, lenses, movement, and color palette
 - Compare to other films from the same director or genre
 
 Do NOT invent details that are not present in the tool result.
@@ -83,13 +81,14 @@ Your answers must be:
 - Accurate and grounded in tool data
 - Helpful to film students, cinematographers, and enthusiasts
 
-When appropriate, include:
-- Shot types
-- Lens choices
-- Color palette descriptions
-- Lighting structures (e.g., Rembrandt, high-key, practical lighting)
-- Camera movement techniques (steadicam, dolly, handheld)
-- References to famous cinematographers
+When user asks about the movie's cinematography, include:
+- Information about the movie's cinematography style
+- Information about the movie's lighting
+- Information about the movie's composition
+- Information about the movie's lenses
+- Information about the movie's movement
+- Information about the movie's color palette
+
 
 If the user expresses a preference or shares personal info (e.g., favorite movie, favorite director), personalize your recommendations.
 
@@ -98,10 +97,51 @@ CONTEXT CONTINUITY
 ---------------------------------------------------------
 Remember previous details from the conversation (like the user's name or preferences) unless the session resets.
 
-Your goal is to deliver accurate, tool-grounded, cinematic expertise.
+        Your goal is to deliver accurate, tool-grounded, cinematic expertise.
 """
 
+    def _extract_movie_titles(self, text: str) -> List[str]:
+        """
+        Simple heuristic to extract potential movie titles from text.
+        Looks for capitalized phrases that might be movie titles.
+        This is a fallback when tools aren't called.
+        """
+        titles = []
         
+        # Pattern 1: Quoted strings (likely movie titles)
+        quoted = re.findall(r'["\']([^"\']+)["\']', text)
+        titles.extend(quoted)
+        
+        # Pattern 2: After common verbs like "like", "love", "watch", etc.
+        # Matches: "I like Interstellar" -> "Interstellar"
+        verb_pattern = r'(?:like|love|enjoy|watch|saw|seen|about|discuss|recommend|prefer|think|thought)\s+([A-Z][a-zA-Z0-9\s]+?)(?:\s|\.|,|$|!|\?)'
+        verb_matches = re.findall(verb_pattern, text, re.IGNORECASE)
+        titles.extend(verb_matches)
+        
+        # Pattern 3: Standalone capitalized words/phrases
+        # Split text and look for sequences of capitalized words
+        words = re.findall(r'\b([A-Z][a-zA-Z0-9]+)\b', text)
+        # Filter out common words and very short words
+        common_words = {'I', 'The', 'A', 'An', 'And', 'Or', 'But', 'In', 'On', 'At', 'To', 'For', 'Of', 'With', 'From'}
+        for word in words:
+            if len(word) > 3 and word not in common_words:
+                # Check if it's not at the start of sentence (more likely to be a title)
+                word_pos = text.find(word)
+                if word_pos > 0:  # Not at start
+                    titles.append(word)
+        
+        # Clean and deduplicate
+        cleaned_titles = []
+        seen = set()
+        for title in titles:
+            title = title.strip()
+            if len(title) > 2:
+                title_lower = title.lower()
+                if title_lower not in seen and title_lower not in ['the', 'a', 'an', 'i', 'you', 'we', 'they']:
+                    seen.add(title_lower)
+                    cleaned_titles.append(title)
+        
+        return cleaned_titles
     
     def _call_llm(self, messages: List[Dict], use_tools: bool = True) -> Dict:
         url = "https://api.openai.com/v1/chat/completions"
@@ -113,7 +153,7 @@ Your goal is to deliver accurate, tool-grounded, cinematic expertise.
         payload = {
             "model": self.model,
             "messages": messages,
-            "temperature": 0.7,
+            "temperature": 0.3,
         }
         
         if use_tools:
@@ -195,6 +235,14 @@ Your goal is to deliver accurate, tool-grounded, cinematic expertise.
             if not tool_calls:
                 final_answer = content or "I apologize, I couldn't generate a response."
                 self.memory.add_message("assistant", final_answer)
+                
+                # Try to extract movie titles from user input even if no tools were called
+                # This helps track movies mentioned in casual conversation
+                potential_movies = self._extract_movie_titles(user_input)
+                for movie_title in potential_movies:
+                    # Add to discussed movies even without full movie data
+                    if movie_title not in self.memory.movies_discussed:
+                        self.memory.movies_discussed.append(movie_title)
                 
                 #if verbose:
                     #print(f"\n✅ Final Answer:\n{final_answer}\n")

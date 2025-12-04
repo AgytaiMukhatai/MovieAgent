@@ -70,132 +70,6 @@ def search_movie_by_title(title: str) -> str:
 
 
 @tool
-def search_movie_by_id(imdb_id: str) -> str:
-    """
-    Search for a movie by IMDb ID for exact match.
-
-    Args:
-        imdb_id: The IMDb ID (e.g., "tt3896198")
-
-    Returns:
-        JSON string:
-        {
-            "success": bool,
-            "movie"?: {...},
-            "error"?: str
-        }
-    """
-    result = _omdb_request({"i": imdb_id})
-    return json.dumps(result)
-
-
-@tool
-def analyze_cinematography(movie_data: str) -> str:
-    """
-    Provide expert cinematography analysis based on movie information.
-    This tool analyzes the visual style, camera work, and cinematographic choices.
-
-    Args:
-        movie_data: JSON string from other tools, e.g. search_movie_by_title()
-
-    Returns:
-        JSON string:
-        {
-            "success": bool,
-            "analysis"?: {...},
-            "error"?: str
-        }
-    """
-    try:
-        # movie_data can be:
-        # - '{"success": true, "movie": {...}}'
-        # - '{"Title": "...", ...}' (raw OMDb object)
-        if isinstance(movie_data, str):
-            wrapper = json.loads(movie_data)
-        else:
-            wrapper = movie_data
-
-        # If coming from search_movie_by_title / search_movie_by_id
-        if "movie" in wrapper:
-            movie = wrapper["movie"]
-        else:
-            movie = wrapper
-
-        title = movie.get("Title", "Unknown")
-        year = movie.get("Year", "Unknown")
-        director = movie.get("Director", "Unknown")
-        genre = movie.get("Genre", "Unknown")
-
-        analysis = {
-            "title": title,
-            "year": year,
-            "director": director,
-            "genre": genre,
-            "analysis": {
-                "overview": f"Cinematographic analysis of {title} ({year}), directed by {director}.",
-                "visual_style": f"This {genre.lower()} film employs techniques common to its genre.",
-                "camera_work": "Analysis of camera movements, angles, and shot composition.",
-                "lighting": "Analysis of lighting design and mood creation.",
-                "color_palette": "Analysis of color grading and visual tone.",
-                "notable_techniques": [
-                    "Genre-specific cinematographic approaches",
-                    "Director's visual signature",
-                    "Technical innovations or traditional methods"
-                ]
-            },
-            "cinematographer": "Information not available in current data source",
-            "technical_specs": {
-                "aspect_ratio": "Information not available",
-                "camera": "Information not available",
-                "film_stock_or_digital": "Information not available"
-            }
-        }
-
-        # Example DB for special cases
-        cinematography_database = {
-            "Guardians of the Galaxy Vol. 2": {
-                "cinematographer": "Henry Braham",
-                "camera_work": "Dynamic camera movements combining Steadicam and crane shots, extensive use of gimbal rigs for action sequences",
-                "lighting": "Vibrant, colorful lighting schemes with heavy use of practical neon and colored gels. High-key lighting for the fantastical space environments",
-                "color_palette": "Extremely saturated color palette with bold primary colors - reds, blues, yellows, and purples.",
-                "visual_style": "Pop-art inspired visual design with psychedelic color schemes.",
-                "technical_specs": {
-                    "camera": "RED Weapon 8K",
-                    "aspect_ratio": "2.39:1 (Anamorphic)",
-                    "format": "Digital"
-                },
-                "notable_scenes": [
-                    "Opening sequence with Baby Groot dancing",
-                    "Ego's planet sequences",
-                    "Yondu's arrow sequence"
-                ]
-            }
-        }
-
-        if title in cinematography_database:
-            specific = cinematography_database[title]
-            analysis["cinematographer"] = specific.get("cinematographer")
-            analysis["analysis"]["camera_work"] = specific.get("camera_work")
-            analysis["analysis"]["lighting"] = specific.get("lighting")
-            analysis["analysis"]["color_palette"] = specific.get("color_palette")
-            analysis["analysis"]["visual_style"] = specific.get("visual_style")
-            analysis["technical_specs"] = specific.get("technical_specs", analysis["technical_specs"])
-            if "notable_scenes" in specific:
-                analysis["notable_scenes"] = specific["notable_scenes"]
-
-        return json.dumps({
-            "success": True,
-            "analysis": analysis
-        })
-
-    except Exception as e:
-        return json.dumps({
-            "success": False,
-            "error": f"Analysis failed: {str(e)}"
-        })
-
-
-@tool
 def get_movie_ratings(movie_data: str) -> str:
     """
     Extract and analyze ratings from various sources (IMDb, Rotten Tomatoes, Metacritic).
@@ -240,8 +114,6 @@ def get_movie_ratings(movie_data: str) -> str:
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
 
-
-# ---------- NEW TOOLS ---------- #
 
 @tool
 def search_movies_list(query: str,
@@ -509,8 +381,6 @@ def find_movies_by_min_imdb_rating(query: str,
 
 AVAILABLE_TOOLS = [
     search_movie_by_title,
-    search_movie_by_id,
-    analyze_cinematography,
     get_movie_ratings,
     search_movies_list,
     compare_movies,
